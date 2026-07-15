@@ -1,0 +1,1392 @@
+openapi: 3.0.3
+info:
+  title: Take Water Delivery API
+  version: 1.0.1
+  contact:
+    name: Take Water Team
+    email: dev@takewater.com
+  description: |
+    API for Take Water purified water delivery mobile app.
+    Built with ASP.NET Core, consumed by React Native.
+
+    ## Authentication
+    All authenticated endpoints require `Authorization: Bearer <token>` header.
+    Token is obtained from `/api/v1/login` and stored in `m_token` table.
+
+    ## Database Tables
+    - `m_units` — Product units (bottle, pack, etc.)
+    - `m_products` — Product catalog with pricing
+    - `m_customers` — Customer accounts
+    - `m_staffs` — Staff accounts (admin/sales)
+    - `t_orders` — Order headers
+    - `t_order_details` — Order line items
+    - `t_knowledge_posts` — Knowledge sharing articles
+    - `m_regions` — Regions/States
+    - `m_townships` — Townships/Districts
+    - `m_token` — Auth tokens
+
+# --- CRITICAL: ENTIRELY OUTDENTED TO THE FAR LEFT (NO LEADING SPACES) ---
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local Development
+  - url: https://stg-api.takewater.com/api/v1
+    description: Staging
+  - url: https://api.takewater.com/api/v1
+    description: Production
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Auth
+# ... rest of your paths ...
+    description: Registration, Login, Logout
+  - name: Products
+    description: Product catalog
+  - name: Profile
+    description: Customer profile management
+  - name: Orders
+    description: Order placement and history
+  - name: Posts
+    description: Knowledge sharing posts
+  - name: Regions
+    description: Regions and townships
+  - name: Payment
+    description: Payment methods and info
+  - name: Legal
+    description: Privacy policy and terms
+
+paths:
+  # ── Authentication ──────────────────────────────────────────────
+  /register:
+    post:
+      tags: [Auth]
+      summary: Customer Registration
+      description: |
+        Register a new customer account.
+        Creates record in `m_customers` table.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /login:
+    post:
+      tags: [Auth]
+      summary: Customer Login
+      description: |
+        Authenticate with mobile_phone and password.
+        Returns JWT token stored in `m_token` table.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /logout:
+    post:
+      tags: [Auth]
+      summary: Customer Logout
+      description: |
+        Invalidate current session token.
+        Sets `is_active = 0` in `m_token` table.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /forgot-password:
+    post:
+      tags: [Auth]
+      summary: Forgot Password (Two-step process)
+      description: |
+        **Step 1 — Verify identity:** Send `mobile_phone` + `name` (no password).
+        Backend finds customer and returns `user_id`.
+
+        **Step 2 — Reset password:** Send `user_id` + `password` (no phone/name).
+        Backend updates password.
+
+        Backend detects step by checking if `password` is provided.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Step 1: identity verified with user_id, or Step 2: password updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForgotPasswordResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Customer not found (Step 1)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ── Products ────────────────────────────────────────────────────
+  /products:
+    get:
+      tags: [Products]
+      summary: Get Product List (with pagination)
+      description: |
+        Get active products with unit info and pagination.
+        Joins `m_products` with `m_units` for unit_name.
+      parameters:
+        - name: search
+          in: query
+          description: Search by product_name
+          schema:
+            type: string
+        - name: is_active
+          in: query
+          description: Filter by active status
+          schema:
+            type: boolean
+            default: true
+        - name: page
+          in: query
+          description: "Page number"
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: "Items per page"
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Product list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+
+  # ── Profile ─────────────────────────────────────────────────────
+  /profile:
+    get:
+      tags: [Profile]
+      summary: Get Customer Profile
+      description: |
+        Get current customer profile from `m_customers` table.
+        Includes region and township info via FK joins.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /profile/update:
+    put:
+      tags: [Profile]
+      summary: Update Customer Profile
+      description: |
+        Update customer profile fields in `m_customers` table.
+        Only provided fields are updated.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ── Orders ──────────────────────────────────────────────────────
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Create New Order
+      description: |
+        Place a new order. Creates record in `t_orders` and line items in `t_order_details`.
+        Order status defaults to 1 (pending).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/customers/{customer_id}:
+    get:
+      tags: [Orders]
+      summary: Get Order History by Customer (with pagination & filter)
+      description: |
+        Get orders for a specific customer with pagination and status filter.
+        Returns counts for each status tab (All, Pending, Confirm, Completed, Cancelled).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          description: Customer ID from `m_customers.id`
+          schema:
+            type: integer
+          example: 1
+        - name: status
+          in: query
+          description: "Filter by status: all, 1=pending, 2=confirm, 3=completed, 4=cancelled"
+          schema:
+            type: string
+            enum: [all, "1", "2", "3", "4"]
+            default: all
+        - name: page
+          in: query
+          description: "Page number"
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: "Items per page"
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Order history with pagination
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get Order Detail
+      description: |
+        Get single order with line items.
+        Joins `t_orders` with `t_order_details` and `m_products`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Order ID from `t_orders.id`
+          schema:
+            type: integer
+          example: 1001
+      responses:
+        '200':
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailResponse'
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/{id}/cancel:
+    put:
+      tags: [Orders]
+      summary: Cancel Order
+      description: |
+        Cancel an order. Updates `order_status` to 4 (cancelled) in `t_orders`.
+        Requires `cancel_reason`. Only pending/confirm orders can be cancelled.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Order ID from `t_orders.id`
+          schema:
+            type: integer
+          example: 1001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelOrderRequest'
+      responses:
+        '200':
+          description: Order cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Order cannot be cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ── Regions ─────────────────────────────────────────────────────
+  /regions:
+    get:
+      tags: [Regions]
+      summary: Get Regions with Townships
+      description: |
+        Get all regions with their townships.
+        Joins `m_regions` and `m_townships` tables.
+      responses:
+        '200':
+          description: Regions list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegionListResponse'
+
+  # ── Privacy Policy ─────────────────────────────────────────────
+  /privacy-policy:
+    get:
+      tags: [Legal]
+      summary: Get Privacy Policy
+      description: |
+        Get privacy policy HTML content for mobile app display.
+        Required for Google Play Store submission.
+      responses:
+        '200':
+          description: Privacy policy content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivacyPolicyResponse'
+
+  # ── Payment Methods ─────────────────────────────────────────────
+  /payment-methods:
+    get:
+      tags: [Payment]
+      summary: Get Payment Methods
+      description: |
+        Get all available payment methods with info images.
+        Images are hosted in wwwroot (static files).
+      responses:
+        '200':
+          description: Payment methods list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethodListResponse'
+
+  # ── Posts ───────────────────────────────────────────────────────
+  /posts:
+    get:
+      tags: [Posts]
+      summary: Get Knowledge Sharing Posts (with pagination)
+      description: |
+        Get active posts from `t_knowledge_posts` table with pagination.
+      parameters:
+        - name: search
+          in: query
+          description: Search by title
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: "Page number"
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: "Items per page"
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Posts list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostListResponse'
+
+# ══════════════════════════════════════════════════════════════════
+# Components
+# ══════════════════════════════════════════════════════════════════
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from login response (stored in m_token.access_token)
+
+  schemas:
+    # ── Auth ──────────────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [mobile_phone, password]
+      properties:
+        mobile_phone:
+          type: string
+          description: "Customer mobile phone (m_customers.mobile_phone)"
+          example: "09777123456"
+        password:
+          type: string
+          format: password
+          description: "Customer password (m_customers.password)"
+          example: "password123"
+
+    RegisterRequest:
+      type: object
+      required: [name, mobile_phone, password, gender]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 200
+          description: "Customer name (m_customers.name)"
+          example: "Ko Min Thura"
+        mobile_phone:
+          type: string
+          pattern: '^09[0-9]{8,10}$'
+          description: "Mobile phone (m_customers.mobile_phone)"
+          example: "09777123456"
+        home_phone:
+          type: string
+          maxLength: 100
+          nullable: true
+          description: "Home phone (m_customers.home_phone)"
+          example: "0123456"
+        password:
+          type: string
+          format: password
+          minLength: 6
+          description: "Password (m_customers.password)"
+          example: "password123"
+        region_id:
+          type: integer
+          nullable: true
+          description: "Region ID FK (m_customers.region_id → m_regions.id)"
+          example: 1
+        township_id:
+          type: integer
+          nullable: true
+          description: "Township ID FK (m_customers.township_id → m_townships.id)"
+          example: 1
+        street_address:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: "Street address (m_customers.street_address)"
+          example: "အမှတ် ၁၂၄၊ ပြည်ထောင်စုလမ်း"
+        dob:
+          type: string
+          format: date
+          nullable: true
+          description: "Date of birth (m_customers.dob)"
+          example: "1998-05-15"
+        gender:
+          type: integer
+          description: "Gender: 1=male, 2=female (m_customers.gender)"
+          enum: [1, 2]
+          example: 1
+        business_type:
+          type: integer
+          nullable: true
+          description: "Business type: 1=အိမ်သုံး, 2=ရုံးခန်း, 3=ဆိုင်/စားသောက်ဆိုင်, 4=အခြား (m_customers.business_type)"
+          enum: [1, 2, 3, 4]
+          example: 1
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Login successful"
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              description: "JWT token (m_token.access_token)"
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            customer:
+              $ref: '#/components/schemas/Customer'
+
+    RegisterResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Registration successful"
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              description: "JWT token (m_token.access_token)"
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            customer:
+              $ref: '#/components/schemas/Customer'
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operation successful"
+
+    ForgotPasswordRequest:
+      type: object
+      description: |
+        Single request for both steps:
+        - Step 1 (verify): mobile_phone + name (no password)
+        - Step 2 (reset): user_id + password (no phone/name)
+      properties:
+        user_id:
+          type: integer
+          nullable: true
+          description: "Customer ID (from Step 1 response) — required for Step 2"
+          example: 1
+        mobile_phone:
+          type: string
+          nullable: true
+          description: "Customer phone (m_customers.mobile_phone) — required for Step 1"
+          example: "09777123456"
+        name:
+          type: string
+          nullable: true
+          description: "Customer name (m_customers.name) — required for Step 1"
+          example: "Ko Min Thura"
+        password:
+          type: string
+          format: password
+          minLength: 6
+          nullable: true
+          description: "New password — required for Step 2"
+          example: "newpass123"
+        confirm_password:
+          type: string
+          format: password
+          minLength: 6
+          nullable: true
+          description: "Confirm new password — required for Step 2"
+          example: "newpass123"
+
+    ForgotPasswordResponse:
+      type: object
+      description: |
+        Step 1 returns user_id. Step 2 returns success message.
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Identity verified"
+        data:
+          type: object
+          nullable: true
+          description: "Only returned in Step 1"
+          properties:
+            user_id:
+              type: integer
+              description: "Customer ID for Step 2"
+              example: 1
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Invalid credentials"
+        errors:
+          type: object
+          nullable: true
+          description: "Field-level validation errors"
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            mobile_phone:
+              - "Phone number is required"
+            password:
+              - "Password must be at least 6 characters"
+
+    # ── Customer ──────────────────────────────────────────────────
+    Customer:
+      type: object
+      description: "Customer record from m_customers table"
+      properties:
+        id:
+          type: integer
+          description: "m_customers.id (PK)"
+          example: 1
+        name:
+          type: string
+          description: "m_customers.name"
+          example: "Ko Min Thura"
+        mobile_phone:
+          type: string
+          description: "m_customers.mobile_phone"
+          example: "09777123456"
+        home_phone:
+          type: string
+          nullable: true
+          description: "m_customers.home_phone"
+          example: "0123456"
+        profile_image_path:
+          type: string
+          nullable: true
+          description: "m_customers.profile_image_path"
+          example: "uploads/customers/1.jpg"
+        region_id:
+          type: integer
+          nullable: true
+          description: "m_customers.region_id (FK → m_regions.id)"
+          example: 1
+        township_id:
+          type: integer
+          nullable: true
+          description: "m_customers.township_id (FK → m_townships.id)"
+          example: 1
+        street_address:
+          type: string
+          nullable: true
+          description: "m_customers.street_address"
+          example: "အမှတ် ၁၂၄၊ ပြည်ထောင်စုလမ်း"
+        dob:
+          type: string
+          format: date
+          nullable: true
+          description: "m_customers.dob"
+          example: "1998-05-15"
+        gender:
+          type: integer
+          description: "m_customers.gender: 1=male, 2=female"
+          example: 1
+        business_type:
+          type: integer
+          nullable: true
+          description: "m_customers.business_type: 1=အိမ်သုံး, 2=ရုံးခန်း, 3=ဆိုင်, 4=အခြား"
+          example: 1
+        is_active:
+          type: integer
+          description: "m_customers.is_active"
+          example: 1
+        created_datetime:
+          type: string
+          format: date-time
+          description: "m_customers.created_datetime"
+          example: "2026-01-15T08:30:00Z"
+
+    # ── Product ───────────────────────────────────────────────────
+    Product:
+      type: object
+      description: "Product record from m_products table with unit join"
+      properties:
+        id:
+          type: integer
+          description: "m_products.id (PK)"
+          example: 1
+        unit_id:
+          type: integer
+          nullable: true
+          description: "m_products.unit_id (FK → m_units.id)"
+          example: 1
+        unit_name:
+          type: string
+          nullable: true
+          description: "m_units.unit_name (joined)"
+          example: "bottle"
+        product_name:
+          type: string
+          description: "m_products.product_name"
+          example: "Take Premium Purified 20L"
+        product_code:
+          type: string
+          nullable: true
+          description: "m_products.product_code"
+          example: "TP-20L-001"
+        product_image_path:
+          type: string
+          nullable: true
+          description: "m_products.product_image_path"
+          example: "uploads/products/20l.jpg"
+        product_description:
+          type: string
+          nullable: true
+          description: "m_products.product_description"
+          example: "Premium purified drinking water 20L bottle"
+        sale_price:
+          type: number
+          format: decimal(18,5)
+          description: "m_products.sale_price"
+          example: 2500.00
+        discount_amount:
+          type: number
+          format: decimal(18,5)
+          description: "m_products.discount_amount"
+          example: 0.00
+        discount_percent:
+          type: integer
+          description: "m_products.discount_percent"
+          example: 0
+        sale_discountprice:
+          type: number
+          format: decimal(18,5)
+          description: "m_products.sale_discountprice (final price after discount)"
+          example: 2500.00
+        is_active:
+          type: integer
+          description: "m_products.is_active"
+          example: 1
+        created_datetime:
+          type: string
+          format: date-time
+          description: "m_products.created_datetime"
+          example: "2026-01-10T08:00:00Z"
+
+    ProductListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        total:
+          type: integer
+          description: "Total products"
+          example: 20
+        page:
+          type: integer
+          description: "Current page"
+          example: 1
+        limit:
+          type: integer
+          description: "Items per page"
+          example: 10
+
+    # ── Profile ───────────────────────────────────────────────────
+    ProfileResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Customer'
+
+    UpdateProfileRequest:
+      type: object
+      description: "All fields optional — only provided fields are updated"
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 200
+          description: "m_customers.name"
+          example: "Ko Min Thura"
+        home_phone:
+          type: string
+          maxLength: 100
+          nullable: true
+          description: "m_customers.home_phone"
+          example: "0123456"
+        profile_image_path:
+          type: string
+          nullable: true
+          description: "m_customers.profile_image_path"
+          example: "uploads/customers/1.jpg"
+        region_id:
+          type: integer
+          nullable: true
+          description: "m_customers.region_id (FK → m_regions.id)"
+          example: 1
+        township_id:
+          type: integer
+          nullable: true
+          description: "m_customers.township_id (FK → m_townships.id)"
+          example: 1
+        street_address:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: "m_customers.street_address"
+          example: "အမှတ် ၁၂၄၊ ပြည်ထောင်စုလမ်း"
+        dob:
+          type: string
+          format: date
+          nullable: true
+          description: "m_customers.dob"
+          example: "1998-05-15"
+        gender:
+          type: integer
+          description: "m_customers.gender: 1=male, 2=female"
+          enum: [1, 2]
+          example: 1
+        business_type:
+          type: integer
+          nullable: true
+          description: "m_customers.business_type: 1=အိမ်သုံး, 2=ရုံးခန်း, 3=ဆိုင်, 4=အခြား"
+          enum: [1, 2, 3, 4]
+          example: 1
+
+    # ── Orders ────────────────────────────────────────────────────
+    CreateOrderRequest:
+      type: object
+      required: [amount, region_id, township_id, street_address, phone_no, items]
+      properties:
+        amount:
+          type: number
+          format: decimal(18,5)
+          description: "t_orders.amount — total order amount (sum of price × quantity)"
+          example: 5000.00
+        region_id:
+          type: integer
+          description: "t_orders.region_id (FK → m_regions.id) — delivery region"
+          example: 1
+        township_id:
+          type: integer
+          description: "t_orders.township_id (FK → m_townships.id) — delivery township"
+          example: 3
+        street_address:
+          type: string
+          maxLength: 255
+          description: "t_orders.street_address — delivery street address"
+          example: "အမှတ် ၁၂၄၊ ပြည်ထောင်စုလမ်း"
+        phone_no:
+          type: string
+          maxLength: 100
+          description: "t_orders.phone_no — delivery phone number"
+          example: "09777123456"
+        remark:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: "t_orders.remark — delivery instructions"
+          example: "အိမ်ရှေ့တံခါးမှာ ထားပေးပါ"
+        payment_image_path:
+          type: string
+          nullable: true
+          description: "t_orders.payment_image_path (for KBZ/Wave transfers)"
+          example: "uploads/payments/receipt1.jpg"
+        items:
+          type: array
+          minItems: 1
+          description: "Order line items (t_order_details)"
+          items:
+            type: object
+            required: [product_id, price, quantity]
+            properties:
+              product_id:
+                type: integer
+                description: "t_order_details.product_id (FK → m_products.id)"
+                example: 1
+              price:
+                type: number
+                format: decimal(18,5)
+                description: "t_order_details.price (unit price at time of order)"
+                example: 2500.00
+              quantity:
+                type: integer
+                minimum: 1
+                description: "t_order_details.quantity"
+                example: 2
+
+    CancelOrderRequest:
+      type: object
+      required: [cancel_reason]
+      properties:
+        cancel_reason:
+          type: string
+          maxLength: 500
+          description: "t_orders.cancel_reason"
+          example: "မှာယူလိုက်သည့်ပစ္စည်း မလိုတော့ပါ"
+
+    Order:
+      type: object
+      description: "Order record from t_orders table with items"
+      properties:
+        id:
+          type: integer
+          description: "t_orders.id (PK)"
+          example: 1001
+        sale_person_id:
+          type: integer
+          nullable: true
+          description: "t_orders.sale_person_id (FK → m_staffs.id)"
+          example: 5
+        order_number:
+          type: string
+          description: "t_orders.order_number"
+          example: "ORD-2026-001"
+        order_date:
+          type: string
+          format: date
+          description: "t_orders.order_date"
+          example: "2026-07-07"
+        remark:
+          type: string
+          nullable: true
+          description: "t_orders.remark"
+          example: "အိမ်ရှေ့တံခါးမှာ ထားပေးပါ"
+        amount:
+          type: number
+          format: decimal(18,5)
+          description: "t_orders.amount (total order amount)"
+          example: 5000.00
+        order_status:
+          type: integer
+          description: "t_orders.order_status: 1=pending, 2=confirm, 3=completed, 4=cancelled"
+          enum: [1, 2, 3, 4]
+          example: 1
+        order_status_text:
+          type: string
+          description: "Human-readable status"
+          example: "pending"
+        cancel_reason:
+          type: string
+          nullable: true
+          description: "t_orders.cancel_reason"
+          example: null
+        payment_image_path:
+          type: string
+          nullable: true
+          description: "t_orders.payment_image_path"
+          example: null
+        customer_id:
+          type: integer
+          description: "t_orders.customer_id (FK → m_customers.id)"
+          example: 1
+        region_id:
+          type: integer
+          nullable: true
+          description: "t_orders.region_id (FK → m_regions.id)"
+          example: 1
+        township_id:
+          type: integer
+          nullable: true
+          description: "t_orders.township_id (FK → m_townships.id)"
+          example: 1
+        street_address:
+          type: string
+          description: "t_orders.street_address"
+          example: "အမှတ် ၁၂၄၊ ပြည်ထောင်စုလမ်း"
+        phone_no:
+          type: string
+          description: "t_orders.phone_no"
+          example: "09777123456"
+        items:
+          type: array
+          description: "Order line items (t_order_details + m_products)"
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        created_datetime:
+          type: string
+          format: date-time
+          description: "t_orders.created_datetime"
+          example: "2026-07-07T10:30:00Z"
+        updated_datetime:
+          type: string
+          format: date-time
+          nullable: true
+          description: "t_orders.updated_datetime"
+          example: "2026-07-07T11:00:00Z"
+
+    OrderItem:
+      type: object
+      description: "Order line item from t_order_details table"
+      properties:
+        id:
+          type: integer
+          description: "t_order_details.id (PK)"
+          example: 1
+        order_id:
+          type: integer
+          description: "t_order_details.order_id (FK → t_orders.id)"
+          example: 1001
+        product_id:
+          type: integer
+          description: "t_order_details.product_id (FK → m_products.id)"
+          example: 1
+        product_name:
+          type: string
+          description: "Product name (joined from m_products)"
+          example: "Take Premium Purified 20L"
+        price:
+          type: number
+          format: decimal(18,5)
+          description: "t_order_details.price"
+          example: 2500.00
+        quantity:
+          type: integer
+          description: "t_order_details.quantity"
+          example: 2
+        subtotal:
+          type: number
+          description: "Calculated: price × quantity"
+          example: 5000.00
+
+    OrderResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Order created successfully"
+        data:
+          $ref: '#/components/schemas/Order'
+
+    OrderDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Order'
+
+    OrderListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        total:
+          type: integer
+          description: "Total orders for current filter"
+          example: 25
+        page:
+          type: integer
+          description: "Current page"
+          example: 1
+        limit:
+          type: integer
+          description: "Items per page"
+          example: 10
+        counts:
+          type: object
+          description: "Order counts for each status tab"
+          properties:
+            all:
+              type: integer
+              description: "Total orders (all statuses)"
+              example: 25
+            pending:
+              type: integer
+              description: "Status 1 count"
+              example: 5
+            confirm:
+              type: integer
+              description: "Status 2 count"
+              example: 3
+            completed:
+              type: integer
+              description: "Status 3 count"
+              example: 12
+            cancelled:
+              type: integer
+              description: "Status 4 count"
+              example: 5
+
+    # ── Regions ───────────────────────────────────────────────────
+    Township:
+      type: object
+      description: "Township record from m_townships table"
+      properties:
+        id:
+          type: integer
+          description: "m_townships.id (PK)"
+          example: 1
+        region_id:
+          type: integer
+          description: "m_townships.region_id (FK → m_regions.id)"
+          example: 1
+        township_name:
+          type: string
+          description: "m_townships.township_name"
+          example: "ဗိုလ်တထောင်"
+
+    Region:
+      type: object
+      description: "Region record from m_regions table with townships"
+      properties:
+        id:
+          type: integer
+          description: "m_regions.id (PK)"
+          example: 1
+        region_name:
+          type: string
+          description: "m_regions.region_name"
+          example: "ရန်ကုန်"
+        townships:
+          type: array
+          description: "Townships in this region"
+          items:
+            $ref: '#/components/schemas/Township'
+
+    RegionListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Region'
+
+    # ── Privacy Policy ────────────────────────────────────────────
+    PrivacyPolicyResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            title:
+              type: string
+              description: "Privacy policy title"
+              example: "Privacy Policy"
+            content:
+              type: string
+              description: "HTML content for privacy policy"
+              example: "<h1>Privacy Policy</h1><p>Take Water App...</p>"
+            last_updated:
+              type: string
+              description: "Last updated date"
+              example: "2026-07-07"
+
+    # ── Payment Methods ───────────────────────────────────────────
+    PaymentMethod:
+      type: object
+      description: "Payment method with info image"
+      properties:
+        id:
+          type: integer
+          description: "Payment method ID"
+          example: 1
+        name:
+          type: string
+          description: "Payment method name"
+          example: "KBZ Pay"
+        description:
+          type: string
+          nullable: true
+          description: "Payment method description"
+          example: "KBZ Pay ဖြင့် ငွေပေးချေနိုင်ပါသည်"
+        image_url:
+          type: string
+          description: "Info image URL (from wwwroot/images/payment/)"
+          example: "/images/payment/kbzpay-qr.png"
+        is_active:
+          type: integer
+          description: "1=active, 0=inactive"
+          example: 1
+
+    PaymentMethodListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentMethod'
+
+    # ── Posts ─────────────────────────────────────────────────────
+    Post:
+      type: object
+      description: "Knowledge post from t_knowledge_posts table"
+      properties:
+        id:
+          type: integer
+          description: "t_knowledge_posts.id (PK)"
+          example: 1
+        title:
+          type: string
+          description: "t_knowledge_posts.title"
+          example: "ရေသန့်စင်ပြီးသောက်ရေ၏ အကျိုးကျေးဇူးများ"
+        content:
+          type: string
+          description: "t_knowledge_posts.content"
+          example: "သန့်စင်ပြီးသောက်ရေသည် ကျန်းမာရေးအတွက် အရေးကြီးပါသည်..."
+        image_path:
+          type: string
+          nullable: true
+          description: "t_knowledge_posts.image_path"
+          example: "uploads/posts/hydration.jpg"
+        created_datetime:
+          type: string
+          format: date-time
+          description: "t_knowledge_posts.created_datetime"
+          example: "2026-07-01T09:00:00Z"
+
+    PostListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Post'
+        total:
+          type: integer
+          description: "Total posts"
+          example: 15
+        page:
+          type: integer
+          description: "Current page"
+          example: 1
+        limit:
+          type: integer
+          description: "Items per page"
+          example: 10
