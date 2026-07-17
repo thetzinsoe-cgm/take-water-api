@@ -659,14 +659,7 @@ components:
           type: string
           example: "Login successful"
         data:
-          type: object
-          properties:
-            token:
-              type: string
-              description: "JWT token (m_token.access_token)"
-              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-            customer:
-              $ref: '#/components/schemas/Customer'
+          $ref: '#/components/schemas/LoginResponse_data'
 
     RegisterResponse:
       type: object
@@ -678,14 +671,7 @@ components:
           type: string
           example: "Registration successful"
         data:
-          type: object
-          properties:
-            token:
-              type: string
-              description: "JWT token (m_token.access_token)"
-              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-            customer:
-              $ref: '#/components/schemas/Customer'
+          $ref: '#/components/schemas/LoginResponse_data'
 
     SuccessResponse:
       type: object
@@ -746,14 +732,7 @@ components:
           type: string
           example: "Identity verified"
         data:
-          type: object
-          nullable: true
-          description: "Only returned in Step 1"
-          properties:
-            user_id:
-              type: integer
-              description: "Customer ID for Step 2"
-              example: 1
+          $ref: '#/components/schemas/ForgotPasswordResponse_data'
 
     ChangePasswordRequest:
       type: object
@@ -1067,23 +1046,7 @@ components:
           minItems: 1
           description: "Order line items (t_order_details)"
           items:
-            type: object
-            required: [product_id, price, quantity]
-            properties:
-              product_id:
-                type: integer
-                description: "t_order_details.product_id (FK → m_products.id)"
-                example: 1
-              price:
-                type: number
-                format: decimal(18,5)
-                description: "t_order_details.price (unit price at time of order)"
-                example: 2500.00
-              quantity:
-                type: integer
-                minimum: 1
-                description: "t_order_details.quantity"
-                example: 2
+            $ref: '#/components/schemas/CreateOrderRequest_items'
 
     CancelOrderRequest:
       type: object
@@ -1263,29 +1226,7 @@ components:
           description: "Items per page"
           example: 10
         counts:
-          type: object
-          description: "Order counts for each status tab"
-          properties:
-            all:
-              type: integer
-              description: "Total orders (all statuses)"
-              example: 25
-            pending:
-              type: integer
-              description: "Status 1 count"
-              example: 5
-            confirm:
-              type: integer
-              description: "Status 2 count"
-              example: 3
-            completed:
-              type: integer
-              description: "Status 3 count"
-              example: 12
-            cancelled:
-              type: integer
-              description: "Status 4 count"
-              example: 5
+          $ref: '#/components/schemas/OrderListResponse_counts'
 
     # ── Regions ───────────────────────────────────────────────────
     Township:
@@ -1342,20 +1283,7 @@ components:
           type: boolean
           example: true
         data:
-          type: object
-          properties:
-            title:
-              type: string
-              description: "Privacy policy title"
-              example: "Privacy Policy"
-            content:
-              type: string
-              description: "HTML content for privacy policy"
-              example: "<h1>Privacy Policy</h1><p>Take Water App...</p>"
-            last_updated:
-              type: string
-              description: "Last updated date"
-              example: "2026-07-07"
+          $ref: '#/components/schemas/PrivacyPolicyResponse_data'
 
     # ── Payment Methods ───────────────────────────────────────────
     PaymentMethod:
@@ -1445,3 +1373,84 @@ components:
           type: integer
           description: "Items per page"
           example: 10
+
+    # ── Nested Schemas (for Swagger compatibility) ──────────────────
+    LoginResponse_data:
+      type: object
+      properties:
+        token:
+          type: string
+          description: "JWT token (m_token.access_token)"
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        customer:
+          $ref: '#/components/schemas/Customer'
+
+    ForgotPasswordResponse_data:
+      type: object
+      description: "Only returned in Step 1"
+      nullable: true
+      properties:
+        user_id:
+          type: integer
+          description: "Customer ID for Step 2"
+          example: 1
+
+    CreateOrderRequest_items:
+      type: object
+      required: [product_id, price, quantity]
+      properties:
+        product_id:
+          type: integer
+          description: "t_order_details.product_id (FK → m_products.id)"
+          example: 1
+        price:
+          type: number
+          format: decimal(18,5)
+          description: "t_order_details.price (unit price at time of order)"
+          example: 2500.00
+        quantity:
+          type: integer
+          minimum: 1
+          description: "t_order_details.quantity"
+          example: 2
+
+    OrderListResponse_counts:
+      type: object
+      description: "Order counts for each status tab"
+      properties:
+        all:
+          type: integer
+          description: "Total orders (all statuses)"
+          example: 25
+        pending:
+          type: integer
+          description: "Status 1 count"
+          example: 5
+        confirm:
+          type: integer
+          description: "Status 2 count"
+          example: 3
+        completed:
+          type: integer
+          description: "Status 3 count"
+          example: 12
+        cancelled:
+          type: integer
+          description: "Status 4 count"
+          example: 5
+
+    PrivacyPolicyResponse_data:
+      type: object
+      properties:
+        title:
+          type: string
+          description: "Privacy policy title"
+          example: "Privacy Policy"
+        content:
+          type: string
+          description: "HTML content for privacy policy"
+          example: "<h1>Privacy Policy</h1><p>Take Water App...</p>"
+        last_updated:
+          type: string
+          description: "Last updated date"
+          example: "2026-07-07"
