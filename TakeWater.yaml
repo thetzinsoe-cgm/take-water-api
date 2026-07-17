@@ -168,9 +168,12 @@ paths:
       - Auth
       summary: Change Password
       description: |
-        Change password for a customer.
-        Requires `customer_id`, `new_password`, and `confirm_password`.
-        Updates `m_customers.password` for the specified customer.
+        Change password for logged-in user.
+        Requires JWT token in Authorization header.
+        Only `new_password` and `confirm_password` needed.
+        Backend identifies customer from JWT token.
+      security:
+      - bearerAuth: []
       requestBody:
         content:
           application/json:
@@ -185,13 +188,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
         "400":
-          description: Validation error (passwords don't match, customer not found)
+          description: Validation error (passwords don't match)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Customer not found
+        "401":
+          description: Unauthorized (invalid or missing token)
           content:
             application/json:
               schema:
@@ -820,14 +823,9 @@ components:
     ChangePasswordRequest:
       type: object
       required:
-      - customer_id
       - new_password
       - confirm_password
       properties:
-        customer_id:
-          type: integer
-          description: Customer ID (m_customers.id)
-          example: 1
         new_password:
           type: string
           description: New password (updated in m_customers.password)
