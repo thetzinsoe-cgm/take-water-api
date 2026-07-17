@@ -166,13 +166,11 @@ paths:
     post:
       tags:
       - Auth
-      summary: Change Password (Authenticated)
+      summary: Change Password
       description: |
-        Change password for logged-in user.
-        Requires valid `old_password` and `new_password`.
-        Verifies old password against `m_customers.password` before updating.
-      security:
-      - bearerAuth: []
+        Change password for a customer.
+        Requires `customer_id`, `new_password`, and `confirm_password`.
+        Updates `m_customers.password` for the specified customer.
       requestBody:
         content:
           application/json:
@@ -187,13 +185,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
         "400":
-          description: Invalid old password or validation error
+          description: Validation error (passwords don't match, customer not found)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Unauthorized (invalid or missing token)
+        "404":
+          description: Customer not found
           content:
             application/json:
               schema:
@@ -731,16 +729,14 @@ components:
     ChangePasswordRequest:
       type: object
       required:
-      - old_password
+      - customer_id
       - new_password
       - confirm_password
       properties:
-        old_password:
-          type: string
-          description: Current password (verified against m_customers.password)
-          format: password
-          minLength: 6
-          example: password123
+        customer_id:
+          type: integer
+          description: Customer ID (m_customers.id)
+          example: 1
         new_password:
           type: string
           description: New password (updated in m_customers.password)
