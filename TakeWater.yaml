@@ -174,6 +174,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /change-password:
+    post:
+      tags: [Auth]
+      summary: Change Password (Authenticated)
+      description: |
+        Change password for logged-in user.
+        Requires valid `old_password` and `new_password`.
+        Verifies old password against `m_customers.password` before updating.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid old password or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (invalid or missing token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   # ── Products ────────────────────────────────────────────────────
   /products:
     get:
@@ -722,6 +758,29 @@ components:
               type: integer
               description: "Customer ID for Step 2"
               example: 1
+
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password, confirm_password]
+      properties:
+        old_password:
+          type: string
+          format: password
+          minLength: 6
+          description: "Current password (verified against m_customers.password)"
+          example: "password123"
+        new_password:
+          type: string
+          format: password
+          minLength: 6
+          description: "New password (updated in m_customers.password)"
+          example: "newpass456"
+        confirm_password:
+          type: string
+          format: password
+          minLength: 6
+          description: "Confirm new password (must match new_password)"
+          example: "newpass456"
 
     ErrorResponse:
       type: object
