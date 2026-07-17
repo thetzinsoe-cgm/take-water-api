@@ -273,11 +273,56 @@ paths:
       description: |
         Update customer profile fields in `m_customers` table.
         Only provided fields are updated.
+        Use multipart/form-data to upload profile image.
       requestBody:
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              $ref: "#/components/schemas/UpdateProfileRequest"
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: m_customers.name
+                  example: Ko Min Thura
+                home_phone:
+                  type: string
+                  description: m_customers.home_phone
+                  nullable: true
+                  example: "0123456"
+                profile_image:
+                  type: string
+                  format: binary
+                  description: Profile image file (uploaded to uploads/customers/)
+                region_id:
+                  type: integer
+                  description: m_customers.region_id (FK → m_regions.id)
+                  nullable: true
+                  example: 1
+                township_id:
+                  type: integer
+                  description: m_customers.township_id (FK → m_townships.id)
+                  nullable: true
+                  example: 1
+                street_address:
+                  type: string
+                  description: m_customers.street_address
+                  nullable: true
+                  example: အမှတ် ၁၂၄၊ ပြည်ထောင်စုလမ်း
+                dob:
+                  type: string
+                  format: date
+                  description: m_customers.dob
+                  nullable: true
+                  example: "1998-05-15"
+                gender:
+                  type: integer
+                  description: "m_customers.gender: 1=male, 2=female"
+                  example: 1
+                business_type:
+                  type: integer
+                  description: "m_customers.business_type: 1=အိမ်သုံး, 2=ရုံးခန်း, 3=ဆိုင်, 4=အခြား"
+                  nullable: true
+                  example: 1
         required: true
       responses:
         "200":
@@ -302,11 +347,57 @@ paths:
       description: |
         Place a new order. Creates record in `t_orders` and line items in `t_order_details`.
         Order status defaults to 1 (pending).
+        Use multipart/form-data to upload payment receipt image.
       requestBody:
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              $ref: "#/components/schemas/CreateOrderRequest"
+              type: object
+              required:
+              - amount
+              - items
+              - phone_no
+              - region_id
+              - street_address
+              - township_id
+              properties:
+                amount:
+                  type: number
+                  description: t_orders.amount — total order amount (sum of price × quantity)
+                  example: 5000
+                region_id:
+                  type: integer
+                  description: t_orders.region_id (FK → m_regions.id) — delivery region
+                  example: 1
+                township_id:
+                  type: integer
+                  description: t_orders.township_id (FK → m_townships.id) — delivery township
+                  example: 3
+                street_address:
+                  type: string
+                  description: t_orders.street_address — delivery street address
+                  example: အမှတ် ၁၂၄၊ ပြည်ထောင်စုလမ်း
+                phone_no:
+                  type: string
+                  description: t_orders.phone_no — delivery phone number
+                  example: "09777123456"
+                remark:
+                  type: string
+                  description: t_orders.remark — delivery instructions
+                  nullable: true
+                  example: အိမ်ရှေ့တံခါးမှာ ထားပေးပါ
+                payment_type:
+                  type: integer
+                  description: "t_orders.payment_type: 1=CashDown, 2=WaveMoney, 3=KBZ Pay, 4=CB Pay"
+                  example: 1
+                payment_image:
+                  type: string
+                  format: binary
+                  description: Payment receipt image file (for KBZ/Wave transfers)
+                items:
+                  type: string
+                  description: "Order line items as JSON array string (e.g., [{\"product_id\":1,\"price\":2500,\"quantity\":2}])"
+                  example: '[{"product_id":1,"price":2500,"quantity":2}]'
         required: true
       responses:
         "201":
