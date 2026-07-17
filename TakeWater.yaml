@@ -35,6 +35,24 @@ servers:
   - url: https://api.takewater.com/api/v1
     description: Production
 
+tags:
+  - name: Auth
+    description: "Registration, Login, Logout, Change Password"
+  - name: Products
+    description: Product catalog
+  - name: Profile
+    description: Customer profile management
+  - name: Orders
+    description: Order placement and history
+  - name: Posts
+    description: Knowledge sharing posts
+  - name: Regions
+    description: Regions and townships
+  - name: Payment
+    description: Payment methods and info
+  - name: Legal
+    description: Privacy policy and terms
+
 paths:
   # ── Authentication ──────────────────────────────────────────────
   /register:
